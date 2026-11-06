@@ -1,0 +1,44 @@
+name: BlocRA traction report
+description: Fetch BlocRA-signed traction reports for your contracts or assets, verify them, and write them to your repository.
+author: BlocRA
+branding:
+  icon: bar-chart-2
+  color: purple
+inputs:
+  api:
+    description: BlocRA API URL (defaults to "api" in blocra.json)
+    required: false
+  subjects:
+    description: Space-separated contract ids or assets (defaults to "subjects" in blocra.json)
+    required: false
+  chain:
+    description: Chain of the subjects
+    required: false
+    default: stellar
+  days:
+    description: Report period in days
+    required: false
+    default: "30"
+  out:
+    description: Directory for the report files
+    required: false
+    default: reports
+  trusted-key:
+    description: BlocRA signing key to trust (defaults to "trusted_key" in blocra.json)
+    required: false
+runs:
+  using: composite
+  steps:
+    - name: Generate and verify reports
+      shell: bash
+      env:
+        BLOCRA_API: ${{ inputs.api }}
+        BLOCRA_TRUSTED_KEY: ${{ inputs.trusted-key }}
+      run: |
+        set -euo pipefail
+        args=(report --days "${{ inputs.days }}" --chain "${{ inputs.chain }}" --out "${{ inputs.out }}")
+        if [ -n "${{ inputs.subjects }}" ]; then read -ra subjects <<< "${{ inputs.subjects }}"; args+=("${subjects[@]}"); fi
+        [ -z "${BLOCRA_API}" ] && unset BLOCRA_API
+        [ -z "${BLOCRA_TRUSTED_KEY}" ] && unset BLOCRA_TRUSTED_KEY
+        node "${{ github.action_path }}/bin/blocra.js" "${args[@]}"
+        node "${{ github.action_path }}/bin/blocra.js" verify "${{ inputs.out }}"/*.md

@@ -1,0 +1,39 @@
+{
+  "name": "blocra",
+  "version": "0.1.0",
+  "description": "Signed, verifiable on-chain traction reports for your project, from your terminal or CI.",
+  "type": "module",
+  "bin": {
+    "blocra": "bin/blocra.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "keywords": [
+    "web3",
+    "analytics",
+    "traction",
+    "attestation",
+    "stellar",
+    "soroban",
+    "grants",
+    "cli"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Blocra-HQ/blocra-cli.git"
+  },
+  "homepage": "https://github.com/Blocra-HQ/blocra-cli#readme",
+  "bugs": "https://github.com/Blocra-HQ/blocra-cli/issues",
+  "license": "MIT",
+  "author": "BlocRA"
+}

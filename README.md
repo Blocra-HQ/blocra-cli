@@ -67,6 +67,12 @@ npx blocra init --api https://<blocra-api> \
 }
 ```
 
+**Relayers.** Users of apps that submit transactions through a relayer, fee sponsor or smart wallet
+are found automatically: BlocRA counts each contract call for the account that signed its
+authorization, not the account that submitted it. Pass `--relayer <account>` (repeatable) only for
+relayers that sign everything themselves; their calls are then reported separately instead of
+counting as one very active "user".
+
 ### `blocra report [subject...]`
 
 Fetches a signed report per subject (from `blocra.json` unless given), verifies it, prints a summary
@@ -140,7 +146,8 @@ jobs:
 ## Report contents
 
 Scorecard (with change against the previous period), key findings, daily activity, user quality
-(returning accounts, top-10 share, automated accounts, self-payments for assets), contract functions
+(returning accounts, top-10 share, automated accounts, share of calls sent through relayers,
+smart-wallet users, self-payments for assets), contract functions
 or asset holders and supply, ecosystem rank, coverage and methodology, and the signature. Every
 figure comes from BlocRA's API; the findings are fixed rules over those figures, not model output.
 
@@ -154,7 +161,7 @@ figure comes from BlocRA's API; the findings are fixed rules over those figures,
   server; `init` pins the key and reviewers should use BlocRA's published one.
 - **Zero dependencies.** The package uses only Node's built-in `fetch` and `crypto`, and never touches
   private keys.
-- **Roadmap:** relayer and fee-sponsor aware user counts, `blocra publish` (record the report's sha256
+- **Roadmap:** `blocra publish` (record the report's sha256
   in BlocRA's on-chain registry), PDF output, README badge, and more chains.
 
 ## Development

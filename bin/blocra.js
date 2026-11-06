@@ -13,7 +13,7 @@ const VERSION = JSON.parse(readFileSync(new URL("../package.json", import.meta.u
 const HELP = `blocra ${VERSION}: signed, verifiable traction reports for on-chain projects
 
 Usage
-  blocra init --subject <id> [--subject <id>...] [--chain stellar] [--api <url>] [--days 30]
+  blocra init --subject <id> [--subject <id>...] [--relayer <account>...] [--chain stellar] [--api <url>] [--days 30]
   blocra report [<id>...] [--days 7|30] [--out <dir>] [--format md,json]
   blocra verify <file.md|file.json>... [--key <G...>]
   blocra key
@@ -26,6 +26,10 @@ Options
   --chain <name>  Chain of the subjects (default stellar)
   --key <G...>    Signing key to trust when verifying (or BLOCRA_TRUSTED_KEY,
                   or "trusted_key" in ${CONFIG_FILE}, pinned by init)
+  --relayer <id>  An account your project uses to submit transactions for users
+                  (repeatable). Users who sign their own authorization are
+                  found automatically; this only matters for relayers that
+                  sign everything themselves.
   --days <n>      Report period in days (default 7)
   --out <dir>     Where report files are written (default .)
   --format <f>    md, json or md,json (default md,json)
@@ -34,7 +38,7 @@ Reports are computed and signed by BlocRA from on-chain data; this tool only
 fetches and verifies them. Exit code 1 on any failure, so it fits CI.`;
 
 function parseArgs(argv) {
-  const args = { _: [], subject: [] };
+  const args = { _: [], subject: [], relayer: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "-h" || a === "--help") args.help = true;
@@ -44,6 +48,7 @@ function parseArgs(argv) {
       const v = inline ?? argv[++i];
       if (v === undefined) throw new Error(`--${k} needs a value`);
       if (k === "subject") args.subject.push(v);
+      else if (k === "relayer") args.relayer.push(v);
       else args[k] = v;
     } else args._.push(a);
   }
@@ -85,6 +90,7 @@ async function cmdInit(args) {
     api,
     chain,
     subjects,
+    relayers: args.relayer.length ? args.relayer : existing.relayers ?? [],
     days: Number(args.days ?? existing.days ?? 30),
     trusted_key: key.signer,
     out: args.out ?? existing.out ?? "reports",
@@ -103,6 +109,8 @@ function printSummary(report) {
     `  ${fmtInt(k.active_accounts?.value)} active accounts · ${fmtInt(k.calls?.value)} ${noun} · ` +
       `${fmtPct(k.failed_pct?.value)} failed · rank #${report.ecosystem?.rank ?? "—"} of ${report.ecosystem?.of ?? "—"}`,
   );
+  const q = report.quality ?? {};
+  if (q.relayed_calls) console.log(dim(`  ${fmtPct(q.relayed_share_pct)} of calls came through relayers; counted for the users who signed them`));
   for (const f of report.findings ?? []) console.log(`  - ${f}`);
 }
 
@@ -115,13 +123,14 @@ async function cmdReport(args) {
   const chain = (args.chain ?? config?.chain ?? "stellar").toLowerCase();
   const formats = String(args.format ?? "md,json").split(",").map((f) => f.trim());
   const outDir = args.out ?? config?.out ?? ".";
+  const relayers = args.relayer.length ? args.relayer : config?.relayers ?? [];
   const signer = await trustedSigner(args, config, api);
   mkdirSync(outDir, { recursive: true });
 
   let failed = 0;
   for (const subject of subjects) {
     try {
-      const envelope = await fetchSignedReport(api, { subject, days, chain });
+      const envelope = await fetchSignedReport(api, { subject, days, chain, relayers });
       const check = verifyEnvelope(envelope, signer);
       if (!check.ok) throw new Error(`Received report failed verification: ${check.reasons.join("; ")}`);
       const r = check.report;

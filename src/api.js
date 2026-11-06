@@ -30,8 +30,9 @@ export function fetchSigningKey(api) {
 }
 
 /** A signed traction report envelope: { report_json, attestation }. */
-export async function fetchSignedReport(api, { subject, days, chain }) {
+export async function fetchSignedReport(api, { subject, days, chain, relayers = [] }) {
   const params = new URLSearchParams({ subject, days: String(days), chain, signed: "true" });
+  if (relayers.length) params.set("relayers", relayers.join(","));
   const body = await getJson(`${base(api)}/reports/traction?${params}`);
   return body.signed;
 }

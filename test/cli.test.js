@@ -99,3 +99,14 @@ test("blocra verify fails files without a signature", () => {
   assert.equal(res.code, 1);
   assert.match(res.out, /no BlocRA signature/);
 });
+
+test("relayed contract reports show relayer figures and still verify", () => {
+  const relayed = fixture("signed-relayed.json");
+  const r = verifyEnvelope(relayed, SIGNER);
+  assert.equal(r.ok, true, r.reasons.join("; "));
+  assert.ok(r.report.quality.relayed_calls > 0);
+  const md = renderMarkdown(relayed);
+  assert.match(md, /Calls submitted by a relayer or sponsor/);
+  assert.match(md, /Declared relayers \(excluded from account counts\)/);
+  assert.doesNotMatch(md, /NaN|undefined/);
+});

@@ -107,6 +107,15 @@ export function renderBody(report, attestation) {
     ["Automated share of activity", fmtPct(q.bot_like_share_pct)],
   ];
   if (vol && q.self_payment_share_pct != null) qrows.push(["Self-payments (excluded from volume)", fmtPct(q.self_payment_share_pct)]);
+  if (kind === "contract" && q.relayed_share_pct != null) {
+    qrows.push(["Calls submitted by a relayer or sponsor (counted for the signing user)", `${fmtPct(q.relayed_share_pct)} (${fmtInt(q.relayed_calls)})`]);
+    qrows.push(["Smart-wallet (contract) accounts", fmtInt(q.smart_wallet_accounts)]);
+  }
+  const dr = r.declared_relayers;
+  if (dr?.accounts?.length) {
+    qrows.push(["Declared relayers (excluded from account counts)", dr.accounts.map(short).join(", ")]);
+    qrows.push(["Calls from declared relayers without user authorization", fmtInt(dr.calls_without_user_auth ?? 0)]);
+  }
   push(table(["Measure", "Value"], qrows), "");
   if (q.top_accounts?.length) {
     push(

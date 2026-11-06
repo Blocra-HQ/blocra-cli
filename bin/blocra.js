@@ -5,6 +5,7 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, basename } from "node:path";
 import { fetchSigningKey, fetchSignedReport, ApiError } from "../src/api.js";
 import { loadConfig, saveConfig, CONFIG_FILE } from "../src/config.js";
+import { DEFAULT_API, OFFICIAL_KEYS } from "../src/defaults.js";
 import { verifyEnvelope } from "../src/verify.js";
 import { renderMarkdown, parseMarkdown, renderBody, fmtInt, fmtPct } from "../src/markdown.js";
 
@@ -61,15 +62,19 @@ const red = (s) => (process.stdout.isTTY ? `\x1b[31m${s}\x1b[0m` : s);
 const dim = (s) => (process.stdout.isTTY ? `\x1b[2m${s}\x1b[0m` : s);
 
 function apiUrl(args, config) {
-  const api = args.api ?? process.env.BLOCRA_API ?? config?.api;
+  const api = args.api ?? process.env.BLOCRA_API ?? config?.api ?? DEFAULT_API;
   if (!api) throw new Error(`No BlocRA API set. Pass --api <url>, set BLOCRA_API, or run "blocra init --api <url>".`);
   return api;
 }
 
-/** The signer to trust: explicit flag/env/config, otherwise the server's key (with a warning). */
+/**
+ * The signer(s) to trust: an explicit flag/env/config key, else BlocRA's
+ * official keys built into this package, else the server's key (with a notice).
+ */
 async function trustedSigner(args, config, api) {
   const pinned = args.key ?? process.env.BLOCRA_TRUSTED_KEY ?? config?.trusted_key;
   if (pinned) return pinned;
+  if (OFFICIAL_KEYS.length) return OFFICIAL_KEYS;
   const key = await fetchSigningKey(api);
   console.error(dim(`No pinned key; trusting the key served by ${new URL(api).host}: ${key.signer}`));
   return key.signer;
@@ -77,7 +82,7 @@ async function trustedSigner(args, config, api) {
 
 async function cmdInit(args) {
   const existing = loadConfig() ?? {};
-  const api = args.api ?? process.env.BLOCRA_API ?? existing.api;
+  const api = args.api ?? process.env.BLOCRA_API ?? existing.api ?? DEFAULT_API;
   if (!api) throw new Error("Pass --api <url> (the BlocRA API to fetch reports from).");
   const subjects = args.subject.length ? args.subject : existing.subjects ?? [];
   if (!subjects.length) throw new Error("Pass at least one --subject <contract id or asset>.");
@@ -160,7 +165,7 @@ async function cmdReport(args) {
 async function cmdVerify(args) {
   if (!args._.length) throw new Error("Name the report file(s) to verify.");
   const config = loadConfig();
-  let signer = args.key ?? process.env.BLOCRA_TRUSTED_KEY ?? config?.trusted_key;
+  let signer = args.key ?? process.env.BLOCRA_TRUSTED_KEY ?? config?.trusted_key ?? (OFFICIAL_KEYS.length ? OFFICIAL_KEYS : null);
   let failed = 0;
   for (const file of args._) {
     const text = readFileSync(file, "utf8");

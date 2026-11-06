@@ -110,3 +110,8 @@ test("relayed contract reports show relayer figures and still verify", () => {
   assert.match(md, /Declared relayers \(excluded from account counts\)/);
   assert.doesNotMatch(md, /NaN|undefined/);
 });
+
+test("trusts any key in a list of official keys", () => {
+  assert.equal(verifyEnvelope(asset, ["GDQNY3PBOJOKYZSRMK2S7LHHGWZIUISD4QORETLMXEWXBI7KFZZMKTL3", SIGNER]).ok, true);
+  assert.equal(verifyEnvelope(asset, ["GDQNY3PBOJOKYZSRMK2S7LHHGWZIUISD4QORETLMXEWXBI7KFZZMKTL3"]).ok, false);
+});

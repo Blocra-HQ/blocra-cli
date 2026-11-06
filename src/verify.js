@@ -19,7 +19,8 @@ function publicKeyFromAccountId(accountId) {
  * Checks an envelope against the key you trust. Returns
  * { ok, report, reasons[] }; ok is true only if every check passed.
  */
-export function verifyEnvelope(envelope, trustedSigner) {
+export function verifyEnvelope(envelope, trusted) {
+  const trustedSigners = (Array.isArray(trusted) ? trusted : [trusted]).filter(Boolean);
   const reasons = [];
   const att = envelope?.attestation;
   const text = envelope?.report_json;
@@ -27,8 +28,8 @@ export function verifyEnvelope(envelope, trustedSigner) {
     return { ok: false, report: null, reasons: ["Not a BlocRA signed report (missing report_json or attestation)"] };
   }
   if (att.algorithm !== "ed25519") reasons.push(`Unsupported signature algorithm "${att.algorithm}"`);
-  if (trustedSigner && att.signer !== trustedSigner) {
-    reasons.push(`Signed by ${att.signer}, not by the trusted BlocRA key ${trustedSigner}`);
+  if (trustedSigners.length && !trustedSigners.includes(att.signer)) {
+    reasons.push(`Signed by ${att.signer}, not by the trusted BlocRA key${trustedSigners.length > 1 ? "s" : ""} ${trustedSigners.join(", ")}`);
   }
   const sha = createHash("sha256").update(text, "utf8").digest("hex");
   if (att.payload_sha256 && att.payload_sha256 !== sha) reasons.push("payload_sha256 does not match the report");

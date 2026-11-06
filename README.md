@@ -109,8 +109,10 @@ Verifies `.md` or `.json` reports. Exit code `0` only if every file is valid.
   - The Markdown text was edited after signing (it no longer matches the signed report)
 ```
 
-The key to trust comes from `--key`, `BLOCRA_TRUSTED_KEY`, `trusted_key` in `blocra.json`, or, failing
-those, the key the API serves (with a notice). Reviewers should pin BlocRA's published key.
+The key to trust comes from `--key`, `BLOCRA_TRUSTED_KEY` or `trusted_key` in `blocra.json`;
+otherwise BlocRA's official keys built into the package (`src/defaults.js`, which keeps past keys so
+older reports still verify); otherwise the key the API serves, with a notice. A reviewer who received
+a report needs no setup: `npx blocra verify report.md`.
 
 ### `blocra key`
 

@@ -7,7 +7,7 @@ import { fetchSigningKey, fetchSignedReport, ApiError } from "../src/api.js";
 import { loadConfig, saveConfig, CONFIG_FILE } from "../src/config.js";
 import { DEFAULT_API, OFFICIAL_KEYS } from "../src/defaults.js";
 import { verifyEnvelope } from "../src/verify.js";
-import { renderMarkdown, parseMarkdown, renderBody, fmtInt, fmtPct } from "../src/markdown.js";
+import { renderMarkdown, parseMarkdown, bodyMatchesReport, fmtInt, fmtPct } from "../src/markdown.js";
 
 const VERSION = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 
@@ -190,8 +190,7 @@ async function cmdVerify(args) {
     if (!signer) signer = await trustedSigner(args, config, apiUrl(args, config));
     const check = verifyEnvelope(envelope, signer);
     if (check.ok && bodyCheck !== null) {
-      const expected = renderBody(check.report, envelope.attestation).replace(/\n$/, "");
-      if (bodyCheck.replace(/\n+$/, "") !== expected) {
+      if (!bodyMatchesReport(bodyCheck, check.report, envelope.attestation)) {
         check.ok = false;
         check.reasons.push("The Markdown text was edited after signing (it no longer matches the signed report)");
       }

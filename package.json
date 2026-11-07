@@ -1,10 +1,17 @@
 {
   "name": "blocra",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Signed, verifiable on-chain traction reports for your project, from your terminal or CI.",
   "type": "module",
   "bin": {
     "blocra": "bin/blocra.js"
+  },
+  "exports": {
+    "./markdown": "./src/markdown.js",
+    "./strkey": "./src/strkey.js",
+    "./defaults": "./src/defaults.js",
+    "./verify": "./src/verify.js",
+    "./package.json": "./package.json"
   },
   "files": [
     "bin",

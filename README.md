@@ -118,6 +118,22 @@ a report needs no setup: `npx blocra verify report.md`.
 
 Prints the API's signing key, methodology version and supported chains.
 
+## Using the website
+
+Reports exported from the BlocRA website (`/reports`) are the same files `blocra report` writes:
+**Verifiable report (.md)** is this CLI's Markdown with the signed envelope embedded, and **Signed
+data (.json)** is the envelope. Both verify with `npx blocra verify <file>`. The website's PDF is a
+rendering for reading and is not verifiable on its own; ask for the `.md` or `.json`. The website's
+`/verify-report` page runs the same checks in the browser (WebCrypto Ed25519).
+
+The website uses this package's renderer rather than its own: `blocra/markdown` (`renderBody`,
+`renderMarkdown`, `parseMarkdown`, `bodyMatchesReport`) and `blocra/strkey` have no Node-only
+dependencies, so they run in browsers unchanged.
+
+```js
+import { renderMarkdown, parseMarkdown } from "blocra/markdown";
+```
+
 ## GitHub Action
 
 Publish a fresh, verified report every month:
@@ -172,6 +188,10 @@ figure comes from BlocRA's API; the findings are fixed rules over those figures,
 npm test            # node:test, no dependencies
 node bin/blocra.js --help
 ```
+
+`src/markdown.js`, `src/strkey.js` and `src/defaults.js` are copied into blocra-frontend
+(`src/lib/blocra/`); after changing them, run `node scripts/sync-blocra.mjs --write` there
+(its `npm run check:blocra` fails until the copies match).
 
 ## License
 

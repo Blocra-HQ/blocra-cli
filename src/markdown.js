@@ -5,9 +5,31 @@
 // checks the signature, re-renders the body from the signed report and
 // compares it with the file, so an edited figure is caught even though the
 // envelope itself is intact.
+//
+// This module has no Node-only dependencies so the BlocRA website can use the
+// exact same renderer (it is exported as "blocra/markdown"): a report exported
+// from the website and one written by `blocra report` are byte-identical.
 
 const DASH = "—";
 const MARKER = "blocra-attestation:";
+
+// Base64 of UTF-8 text. Node's Buffer when present, otherwise btoa/atob with
+// TextEncoder/TextDecoder (browsers); both give identical output.
+export function utf8ToBase64(text) {
+  if (typeof Buffer !== "undefined") return Buffer.from(text, "utf8").toString("base64");
+  const bytes = new TextEncoder().encode(text);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+export function base64ToUtf8(encoded) {
+  if (typeof Buffer !== "undefined") return Buffer.from(encoded, "base64").toString("utf8");
+  const bin = atob(encoded.replace(/\s+/g, ""));
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
 
 const isNum = (n) => typeof n === "number" && Number.isFinite(n);
 export const fmtInt = (n) => (isNum(n) ? Math.round(n).toLocaleString("en-US") : DASH);
@@ -180,7 +202,7 @@ export function renderBody(report, attestation) {
 /** Full Markdown file: body plus the embedded signed envelope. */
 export function renderMarkdown(envelope) {
   const report = JSON.parse(envelope.report_json);
-  const encoded = Buffer.from(JSON.stringify(envelope), "utf8").toString("base64");
+  const encoded = utf8ToBase64(JSON.stringify(envelope));
   return `${renderBody(report, envelope.attestation)}\n<!-- ${MARKER}${encoded} -->\n`;
 }
 
@@ -192,9 +214,18 @@ export function parseMarkdown(text) {
   const encoded = text.slice(i + 5 + MARKER.length, end);
   let envelope = null;
   try {
-    envelope = JSON.parse(Buffer.from(encoded, "base64").toString("utf8"));
+    envelope = JSON.parse(base64ToUtf8(encoded));
   } catch {
     envelope = null;
   }
   return { body: text.slice(0, i).replace(/\n$/, ""), envelope };
+}
+
+
+/**
+ * True when a Markdown body (from parseMarkdown) is exactly what renderBody
+ * produces for the signed report, i.e. the text was not edited after signing.
+ */
+export function bodyMatchesReport(body, report, attestation) {
+  return body.replace(/\n+$/, "") === renderBody(report, attestation).replace(/\n$/, "");
 }

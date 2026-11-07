@@ -115,3 +115,38 @@ test("trusts any key in a list of official keys", () => {
   assert.equal(verifyEnvelope(asset, ["GDQNY3PBOJOKYZSRMK2S7LHHGWZIUISD4QORETLMXEWXBI7KFZZMKTL3", SIGNER]).ok, true);
   assert.equal(verifyEnvelope(asset, ["GDQNY3PBOJOKYZSRMK2S7LHHGWZIUISD4QORETLMXEWXBI7KFZZMKTL3"]).ok, false);
 });
+
+test("base64 embed/parse is identical with and without Buffer (browser path)", async () => {
+  const md = await import("../src/markdown.js");
+  const samples = [asset, contract, fixture("signed-relayed.json")];
+  const withBuffer = samples.map((env) => md.renderMarkdown(env));
+  const text = "Ünïcödé — ≥ 😀 " + "x".repeat(70000);
+  const b64 = md.utf8ToBase64(text);
+  const saved = Object.getOwnPropertyDescriptor(globalThis, "Buffer");
+  delete globalThis.Buffer;
+  try {
+    assert.equal(typeof Buffer, "undefined");
+    assert.equal(md.utf8ToBase64(text), b64);
+    assert.equal(md.base64ToUtf8(b64), text);
+    samples.forEach((env, i) => {
+      const out = md.renderMarkdown(env);
+      assert.equal(out, withBuffer[i]);
+      const { body, envelope } = md.parseMarkdown(out);
+      assert.deepEqual(envelope, env);
+      assert.ok(md.bodyMatchesReport(body, JSON.parse(env.report_json), env.attestation));
+    });
+  } finally {
+    Object.defineProperty(globalThis, "Buffer", saved);
+  }
+  assert.equal(md.base64ToUtf8(b64), text);
+});
+
+test("package exports the renderer for the website", async () => {
+  const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+  assert.equal(pkg.exports["./markdown"], "./src/markdown.js");
+  assert.equal(pkg.bin.blocra, "bin/blocra.js");
+  const viaExports = await import("blocra/markdown");
+  assert.equal(typeof viaExports.renderMarkdown, "function");
+  assert.equal(typeof viaExports.parseMarkdown, "function");
+  assert.equal(typeof viaExports.renderBody, "function");
+});

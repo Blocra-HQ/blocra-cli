@@ -1,0 +1,5 @@
+{
+  "_comment": "Official BlocRA endpoint and signing keys, built into the CLI so that `blocra verify report.md` works with no setup. Filled in for each release from the production deployment. official_keys lists every key BlocRA has signed reports with (newest first), so reports signed before a key rotation keep verifying. Example: {\"api\": \"https://blocra-api.onrender.com\", \"official_keys\": [\"GABC...\"]}",
+  "api": null,
+  "official_keys": []
+}

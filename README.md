@@ -1,8 +1,7 @@
 # blocra
 
 [![CI](https://github.com/Blocra-HQ/blocra-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/Blocra-HQ/blocra-cli/actions/workflows/ci.yml)
-![Node](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js)
-![Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)
+![Rust](https://img.shields.io/badge/rust-1.75%2B-orange?logo=rust)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 **Signed, verifiable traction reports for on-chain projects, from your terminal or CI.**
@@ -13,13 +12,25 @@ figures are easy to doubt. `blocra` fetches a traction report for your contracts
 a copy in one command.
 
 ```bash
-npx blocra init --api https://<blocra-api> --subject <your contract id>
-npx blocra report
-npx blocra verify reports/*.md
+blocra init --api https://<blocra-api> --subject <your contract id>
+blocra report
+blocra verify reports/*.md
 ```
 
 Chains: **Stellar** today (Soroban contracts and Stellar assets); the CLI and API take a `--chain`
 option so more chains plug in without changes.
+
+## Install
+
+A single static binary, written in Rust.
+
+```bash
+cargo install --git https://github.com/Blocra-HQ/blocra-cli --locked
+```
+
+Or download a prebuilt binary for Linux, macOS or Windows from
+[Releases](https://github.com/Blocra-HQ/blocra-cli/releases) (checksums in `SHA256SUMS`) and put it on
+your `PATH`. In GitHub Actions, use the [Action](#github-action), which installs it for you.
 
 ---
 
@@ -50,7 +61,7 @@ the report from the signed data and compares it with the file's text.
 Writes `blocra.json` in the current directory and pins BlocRA's signing key (trust on first use).
 
 ```bash
-npx blocra init --api https://<blocra-api> \
+blocra init --api https://<blocra-api> \
   --subject CDL74RF5BLYR2YBLCCI7F5FB6TPSCLKEJUBSD2RSVWZ4YHF3VMFAIGWA \
   --subject USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN \
   --days 30
@@ -110,9 +121,9 @@ Verifies `.md` or `.json` reports. Exit code `0` only if every file is valid.
 ```
 
 The key to trust comes from `--key`, `BLOCRA_TRUSTED_KEY` or `trusted_key` in `blocra.json`;
-otherwise BlocRA's official keys built into the package (`src/defaults.js`, which keeps past keys so
+otherwise BlocRA's official keys built into the binary (`defaults.json`, which keeps past keys so
 older reports still verify); otherwise the key the API serves, with a notice. A reviewer who received
-a report needs no setup: `npx blocra verify report.md`.
+a report needs no setup: `blocra verify report.md`.
 
 ### `blocra key`
 
@@ -122,17 +133,14 @@ Prints the API's signing key, methodology version and supported chains.
 
 Reports exported from the BlocRA website (`/reports`) are the same files `blocra report` writes:
 **Verifiable report (.md)** is this CLI's Markdown with the signed envelope embedded, and **Signed
-data (.json)** is the envelope. Both verify with `npx blocra verify <file>`. The website's PDF is a
+data (.json)** is the envelope. Both verify with `blocra verify <file>`. The website's PDF is a
 rendering for reading and is not verifiable on its own; ask for the `.md` or `.json`. The website's
 `/verify-report` page runs the same checks in the browser (WebCrypto Ed25519).
 
-The website uses this package's renderer rather than its own: `blocra/markdown` (`renderBody`,
-`renderMarkdown`, `parseMarkdown`, `bodyMatchesReport`) and `blocra/strkey` have no Node-only
-dependencies, so they run in browsers unchanged.
-
-```js
-import { renderMarkdown, parseMarkdown } from "blocra/markdown";
-```
+The website renders reports in the browser with its own copy of the renderer. Both renderers must
+produce the golden files in [`test/fixtures`](test/fixtures) byte for byte (`cargo test` here,
+`npm run check:blocra` in the website), and both read the official keys from
+[`defaults.json`](defaults.json).
 
 ## GitHub Action
 
@@ -177,21 +185,31 @@ figure comes from BlocRA's API; the findings are fixed rules over those figures,
   flagged.
 - **Pin the key.** Verifying against whatever key a server returns only proves consistency with that
   server; `init` pins the key and reviewers should use BlocRA's published one.
-- **Zero dependencies.** The package uses only Node's built-in `fetch` and `crypto`, and never touches
-  private keys.
+- **Small and auditable.** One binary built on a handful of well-known crates (`ed25519-dalek`,
+  `sha2`, `ureq` with rustls); it never touches private keys.
 - **Roadmap:** `blocra publish` (record the report's sha256
   in BlocRA's on-chain registry), PDF output, README badge, and more chains.
 
 ## Development
 
 ```bash
-npm test            # node:test, no dependencies
-node bin/blocra.js --help
+cargo test                  # renderer parity, verification, end-to-end CLI runs
+cargo run -- --help
+cargo clippy --all-targets && cargo fmt --check
 ```
 
-`src/markdown.js`, `src/strkey.js` and `src/defaults.js` are copied into blocra-frontend
-(`src/lib/blocra/`); after changing them, run `node scripts/sync-blocra.mjs --write` there
-(its `npm run check:blocra` fails until the copies match).
+| Module | |
+|--------|---|
+| `src/main.rs` | Commands and argument parsing |
+| `src/api.rs` | BlocRA API client |
+| `src/verify.rs`, `src/strkey.rs` | Ed25519 signature checks, Stellar key decoding |
+| `src/markdown.rs` | Markdown rendering and parsing |
+| `src/js.rs` | JavaScript-compatible formatting, so the output matches the website's renderer |
+| `src/config.rs`, `src/defaults.rs` | `blocra.json`, built-in official keys |
+
+The report layout is shared with the website: change it in both renderers and regenerate the golden
+files in [`test/fixtures`](test/fixtures) in the same change. Pushing a `v*` tag builds release
+binaries for Linux, macOS and Windows.
 
 ## License
 

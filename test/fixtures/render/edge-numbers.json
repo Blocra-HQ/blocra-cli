@@ -1,0 +1,102 @@
+{
+  "report": {
+    "asset_snapshot": null,
+    "chain": "starknet",
+    "coverage": {
+      "days_covered": 0,
+      "hours_covered": null,
+      "completeness_pct": 0.125,
+      "ledger_from": null,
+      "full_period": 0
+    },
+    "daily": [
+      {
+        "day": "2026-11-06",
+        "active_accounts": 1.4999999999999998,
+        "calls": 2.675,
+        "failed": "7",
+        "volume": 1
+      },
+      {
+        "day": null
+      }
+    ],
+    "ecosystem": {
+      "rank": 0,
+      "of": 12345,
+      "median_failed_pct": 99.99
+    },
+    "findings": [
+      "Pipes | and\nnewlines",
+      "Ünïcödé — ≥ 😀"
+    ],
+    "functions": [
+      {
+        "function": "a|b",
+        "calls": 9007199254740992,
+        "failed_pct": 100
+      }
+    ],
+    "generated_at": 1.5e-7,
+    "kpis": {
+      "active_accounts": {
+        "value": -2.5,
+        "change_pct": 1.005
+      },
+      "calls": {
+        "value": 1234567.895,
+        "change_pct": -1234.56
+      },
+      "calls_per_account": 1e+21,
+      "failed_pct": {
+        "value": 0.0449,
+        "change_pct": 1e-7
+      },
+      "new_accounts": {
+        "reliable": true,
+        "value": 0.5
+      },
+      "volume": null
+    },
+    "method_version": "traction/1",
+    "methodology": [
+      "One",
+      "Two"
+    ],
+    "period": {
+      "days": 0.5,
+      "from": "2026-10-31",
+      "has_previous": false,
+      "previous_from": "2026-10-24",
+      "previous_to": "2026-10-30",
+      "to": "2026-11-06"
+    },
+    "quality": {
+      "top10_share_pct": 5e-7,
+      "bot_threshold_calls_per_day": 1000,
+      "bot_like_accounts": null,
+      "relayed_share_pct": 0,
+      "relayed_calls": 0,
+      "smart_wallet_accounts": 3
+    },
+    "retention": {
+      "returning_pct": 0,
+      "returning_accounts": 0,
+      "previous_active": 10
+    },
+    "subject": {
+      "id": "CDL74RF5BLYR2YBLCCI7F5FB6TPSCLKEJUBSD2RSVWZ4YHF3VMFAIGWA",
+      "kind": "contract"
+    },
+    "type": "traction",
+    "version": 1,
+    "declared_relayers": {
+      "accounts": [
+        "GDYZ7LB3FFFIEKRG4QYSJ34ODEQSXTRTTSE5CHEGOIRUPSKWECHUQ5L7",
+        "G123"
+      ],
+      "calls_without_user_auth": 5
+    }
+  },
+  "attestation": null
+}

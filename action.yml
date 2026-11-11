@@ -29,16 +29,48 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Install blocra
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+        bin="$RUNNER_TEMP/blocra-bin"
+        mkdir -p "$bin"
+        version="$(sed -n 's/^version = "\(.*\)"/\1/p' "$ACTION_PATH/Cargo.toml" | head -1)"
+        case "$RUNNER_OS-$RUNNER_ARCH" in
+          Linux-X64) target=x86_64-unknown-linux-gnu ;;
+          Linux-ARM64) target=aarch64-unknown-linux-gnu ;;
+          macOS-X64) target=x86_64-apple-darwin ;;
+          macOS-ARM64) target=aarch64-apple-darwin ;;
+          *) target="" ;;
+        esac
+        # Prebuilt binary from the matching release, else build from source.
+        url="https://github.com/Blocra-HQ/blocra-cli/releases/download/v${version}/blocra-${target}.tar.gz"
+        if [ -n "$target" ] && curl -fsSL "$url" -o "$RUNNER_TEMP/blocra.tar.gz"; then
+          tar -xzf "$RUNNER_TEMP/blocra.tar.gz" -C "$bin"
+        else
+          echo "No prebuilt blocra ${version} for ${RUNNER_OS}-${RUNNER_ARCH}; building from source."
+          command -v cargo >/dev/null || { curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal; source "$HOME/.cargo/env"; }
+          cargo build --release --locked --manifest-path "$ACTION_PATH/Cargo.toml" --target-dir "$RUNNER_TEMP/blocra-target"
+          cp "$RUNNER_TEMP/blocra-target/release/blocra" "$bin/"
+        fi
+        echo "$bin" >> "$GITHUB_PATH"
     - name: Generate and verify reports
       shell: bash
       env:
         BLOCRA_API: ${{ inputs.api }}
         BLOCRA_TRUSTED_KEY: ${{ inputs.trusted-key }}
+        SUBJECTS: ${{ inputs.subjects }}
+        DAYS: ${{ inputs.days }}
+        CHAIN: ${{ inputs.chain }}
+        OUT: ${{ inputs.out }}
       run: |
         set -euo pipefail
-        args=(report --days "${{ inputs.days }}" --chain "${{ inputs.chain }}" --out "${{ inputs.out }}")
-        if [ -n "${{ inputs.subjects }}" ]; then read -ra subjects <<< "${{ inputs.subjects }}"; args+=("${subjects[@]}"); fi
+        args=(report --days "$DAYS" --chain "$CHAIN" --out "$OUT")
+        if [ -n "$SUBJECTS" ]; then read -ra subjects <<< "$SUBJECTS"; args+=("${subjects[@]}"); fi
         [ -z "${BLOCRA_API}" ] && unset BLOCRA_API
         [ -z "${BLOCRA_TRUSTED_KEY}" ] && unset BLOCRA_TRUSTED_KEY
-        node "${{ github.action_path }}/bin/blocra.js" "${args[@]}"
-        node "${{ github.action_path }}/bin/blocra.js" verify "${{ inputs.out }}"/*.md
+        blocra "${args[@]}"
+        blocra verify "$OUT"/*.md

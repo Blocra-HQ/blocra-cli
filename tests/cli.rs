@@ -114,3 +114,103 @@ fn help_version_and_unknown_commands() {
     assert_eq!(code, 1);
     assert!(out.contains("No BlocRA API set"), "{out}");
 }
+
+/// A one-thread mock of the BlocRA API that serves the signed asset fixture
+/// and records every request path.
+fn mock_api() -> (String, std::sync::Arc<std::sync::Mutex<Vec<String>>>) {
+    use std::io::{BufRead, BufReader, Write};
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}", listener.local_addr().unwrap());
+    let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let log = seen.clone();
+    let envelope = fixture("signed-asset.json");
+    std::thread::spawn(move || {
+        for stream in listener.incoming().flatten() {
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut line = String::new();
+            reader.read_line(&mut line).unwrap();
+            let path = line.split_whitespace().nth(1).unwrap_or("").to_string();
+            loop {
+                let mut h = String::new();
+                if reader.read_line(&mut h).unwrap() <= 2 {
+                    break;
+                }
+            }
+            log.lock().unwrap().push(path.clone());
+            let body = if path.starts_with("/api/reports/traction") {
+                format!("{{\"success\":true,\"signed\":{envelope}}}")
+            } else {
+                "{\"success\":false,\"message\":\"not found\"}".to_string()
+            };
+            let mut s = stream;
+            let _ = write!(s, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len());
+        }
+    });
+    (url, seen)
+}
+
+#[test]
+fn report_sends_the_chosen_period() {
+    let (api, seen) = mock_api();
+    let dir = temp_dir("periods");
+    let key = signer();
+    for (flags, expect) in [
+        (vec!["--range", "all"], "range=all"),
+        (vec!["--range", "1M"], "range=1m"),
+        (
+            vec!["--from", "2026-11-01", "--to", "2026-11-06"],
+            "from=2026-11-01&to=2026-11-06",
+        ),
+        (vec!["--days", "30"], "days=30"),
+        (vec![], "days=7"),
+    ] {
+        let mut args = vec![
+            "report",
+            "USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+            "--api",
+            &api,
+            "--key",
+            &key,
+            "--out",
+            "out",
+        ];
+        args.extend(flags.iter().copied());
+        let (code, out) = blocra(&args, &dir);
+        assert_eq!(code, 0, "{flags:?}: {out}");
+        let last = seen.lock().unwrap().last().cloned().unwrap();
+        assert!(last.contains(expect), "{flags:?} sent {last}");
+    }
+    // File names use the days the signed report covers (7 in the fixture).
+    assert!(dir.join("out/blocra-stellar-usdc-2026-11-06-7d.md").exists());
+
+    // A period saved by init is used by report.
+    fs::write(
+        dir.join("blocra.json"),
+        format!(r#"{{"api": "{api}", "range": "1y", "subjects": ["XLM"]}}"#),
+    )
+    .unwrap();
+    let (code, out) = blocra(&["report", "--key", &key, "--out", "out"], &dir);
+    assert_eq!(code, 0, "{out}");
+    assert!(seen.lock().unwrap().last().unwrap().contains("range=1y"));
+}
+
+#[test]
+fn bad_periods_fail_before_any_request() {
+    let dir = temp_dir("bad-periods");
+    for flags in [
+        vec!["--days", "7", "--range", "7d"],
+        vec!["--range", "forever"],
+        vec!["--to", "2026-11-01"],
+        vec!["--from", "2026-11-10", "--to", "2026-11-01"],
+        vec!["--from", "Nov 1"],
+    ] {
+        let mut args = vec!["report", "XLM", "--api", "http://127.0.0.1:9"];
+        args.extend(flags.iter().copied());
+        let (code, out) = blocra(&args, &dir);
+        assert_eq!(code, 1, "{flags:?}");
+        assert!(
+            !out.contains("Could not reach"),
+            "{flags:?} should fail before calling the API: {out}"
+        );
+    }
+}

@@ -101,7 +101,9 @@ Contract CDL74R…IGWA stellar · 2026-10-31 – 2026-11-06
 
 | Option | Default | |
 |--------|---------|---|
-| `--days <n>` | `7` (or `days` in `blocra.json`) | Report period |
+| `--days <n>` | `7` (or `days` in `blocra.json`) | Report period: the last n days |
+| `--range <r>` | | Or `today`, `yesterday`, `all`, `7d`, `2w`, `1m`, `1y` (whole UTC days) |
+| `--from <date> [--to <date>]` | | Or explicit UTC dates, `YYYY-MM-DD` |
 | `--chain <name>` | `stellar` | Chain of the subjects |
 | `--out <dir>` | `.` (or `out`) | Output directory |
 | `--format <f>` | `md,json` | `md`, `json` or both |

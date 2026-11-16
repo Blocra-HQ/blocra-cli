@@ -67,7 +67,7 @@ pub fn fetch_signing_key(api: &str) -> Result<Value, String> {
 pub fn fetch_signed_report(
     api: &str,
     subject: &str,
-    days: u32,
+    period: &crate::period::Period,
     chain: &str,
     relayers: &[String],
 ) -> Result<Value, String> {
@@ -75,10 +75,11 @@ pub fn fetch_signed_report(
         Url::parse(&format!("{}/reports/traction", base(api))).map_err(|_| format!("Invalid API URL: {api}"))?;
     {
         let mut q = url.query_pairs_mut();
-        q.append_pair("subject", subject)
-            .append_pair("days", &days.to_string())
-            .append_pair("chain", chain)
-            .append_pair("signed", "true");
+        q.append_pair("subject", subject);
+        for (k, v) in period.query() {
+            q.append_pair(k, &v);
+        }
+        q.append_pair("chain", chain).append_pair("signed", "true");
         if !relayers.is_empty() {
             q.append_pair("relayers", &relayers.join(","));
         }

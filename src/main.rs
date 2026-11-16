@@ -11,8 +11,9 @@ use serde_json::{json, Value};
 use blocra::api::{self, fetch_signed_report, fetch_signing_key};
 use blocra::config::{self, CONFIG_FILE};
 use blocra::defaults::{default_api, official_keys};
-use blocra::js::{get, items, nullish, num, or, str_of, stringify, to_str, truthy};
+use blocra::js::{get, items, nullish, or, str_of, stringify, to_str, truthy};
 use blocra::markdown::{body_matches_report, fmt_int, fmt_pct, parse_markdown, render_markdown};
+use blocra::period::Period;
 use blocra::verify::verify_envelope;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -22,8 +23,8 @@ fn help() -> String {
         "blocra {VERSION}: signed, verifiable traction reports for on-chain projects
 
 Usage
-  blocra init --subject <id> [--subject <id>...] [--relayer <account>...] [--chain stellar] [--api <url>] [--days 30]
-  blocra report [<id>...] [--days 7|30] [--out <dir>] [--format md,json]
+  blocra init --subject <id> [--subject <id>...] [--relayer <account>...] [--chain stellar] [--api <url>] [<period>]
+  blocra report [<id>...] [<period>] [--out <dir>] [--format md,json]
   blocra verify <file.md|file.json>... [--key <G...>]
   blocra key
 
@@ -39,7 +40,11 @@ Options
                   (repeatable). Users who sign their own authorization are
                   found automatically; this only matters for relayers that
                   sign everything themselves.
-  --days <n>      Report period in days (default 7)
+  --days <n>      Report period: the last n days (default 7)
+  --range <r>     Or: today, yesterday, all, or a number and unit: 7d, 2w,
+                  1m, 1y (reports cover the whole UTC days the range touches)
+  --from <date>   Or: UTC dates, YYYY-MM-DD; --to defaults to the latest day
+  --to <date>
   --out <dir>     Where report files are written (default .)
   --format <f>    md, json or md,json (default md,json)
 
@@ -145,18 +150,15 @@ fn api_url(args: &Args, config: Option<&Value>) -> Result<String, String> {
         })
 }
 
-fn parse_days(flag: Option<String>, config: Option<&Value>, default: u32) -> Result<u32, String> {
-    let days = match flag {
-        Some(s) => s.trim().parse::<f64>().ok(),
-        None => match get(config, "days") {
-            None | Some(Value::Null) => Some(f64::from(default)),
-            v => num(v).or_else(|| str_of(v).and_then(|s| s.trim().parse().ok())),
-        },
-    };
-    match days {
-        Some(d) if d >= 1.0 && d.fract() == 0.0 && d <= f64::from(u32::MAX) => Ok(d as u32),
-        _ => Err("--days must be a whole number of days (1 or more).".into()),
-    }
+fn period(args: &Args, config: Option<&Value>, default_days: u32) -> Result<Period, String> {
+    Period::resolve(
+        args.opt("days"),
+        args.opt("range"),
+        args.opt("from"),
+        args.opt("to"),
+        config,
+        default_days,
+    )
 }
 
 fn pinned_key(args: &Args, config: Option<&Value>) -> Option<String> {
@@ -223,25 +225,31 @@ fn cmd_init(args: &Args) -> Result<bool, String> {
             );
         }
     }
-    let days = parse_days(args.opt("days"), existing, 30)?;
+    let period = period(args, existing, 30)?;
     let signer = get(key, "signer").cloned().unwrap_or(Value::Null);
-    let config = json!({
+    let mut config = json!({
         "api": api,
         "chain": chain,
         "subjects": subjects,
         "relayers": if args.relayer.is_empty() { cfg_list(existing, "relayers") } else { args.relayer.clone() },
-        "days": days,
-        "trusted_key": signer,
-        "out": args.opt("out").or_else(|| cfg_str(existing, "out")).unwrap_or("reports".into()),
     });
+    for (k, v) in period.config_entries() {
+        config[k] = v;
+    }
+    config["trusted_key"] = signer.clone();
+    config["out"] = json!(args
+        .opt("out")
+        .or_else(|| cfg_str(existing, "out"))
+        .unwrap_or("reports".into()));
     let path = config::save(&config)?;
     let name = path
         .file_name()
         .map_or(CONFIG_FILE.into(), |n| n.to_string_lossy().into_owned());
     println!(
-        "{} Wrote {name}: {} subject(s) on {chain}, {days}-day reports",
+        "{} Wrote {name}: {} subject(s) on {chain}, {} reports",
         green("✓"),
-        subjects.len()
+        subjects.len(),
+        period.describe()
     );
     println!(
         "  Pinned BlocRA signing key {} ({})",
@@ -297,9 +305,10 @@ fn print_summary(report: &Value) {
     }
 }
 
-/// `blocra-<chain>-<subject>-<to>-<days>d`.
-fn report_name(chain: &str, report: &Value, days: u32) -> Result<String, String> {
+/// `blocra-<chain>-<subject>-<to>-<days>d`, with the days the signed report covers.
+fn report_name(chain: &str, report: &Value) -> Result<String, String> {
     let r = Some(report);
+    let days = to_str(get(get(r, "period"), "days"));
     let id = get(get(r, "subject"), "id").ok_or("The report has no subject id")?;
     let to = get(get(r, "period"), "to").ok_or("The report has no period")?;
     let id = to_str(Some(id));
@@ -327,7 +336,7 @@ fn cmd_report(args: &Args) -> Result<bool, String> {
     if subjects.is_empty() {
         return Err("Name a subject (blocra report <id>) or run \"blocra init\" first.".into());
     }
-    let days = parse_days(args.opt("days"), config, 7)?;
+    let period = period(args, config, 7)?;
     let chain = args
         .opt("chain")
         .or_else(|| cfg_str(config, "chain"))
@@ -347,7 +356,7 @@ fn cmd_report(args: &Args) -> Result<bool, String> {
     let mut all_ok = true;
     for subject in &subjects {
         let result = (|| -> Result<(), String> {
-            let envelope = fetch_signed_report(&api, subject, days, &chain, &relayers)?;
+            let envelope = fetch_signed_report(&api, subject, &period, &chain, &relayers)?;
             let check = verify_envelope(&envelope, &signers);
             if !check.ok {
                 return Err(format!(
@@ -356,7 +365,7 @@ fn cmd_report(args: &Args) -> Result<bool, String> {
                 ));
             }
             let report = check.report.as_ref().ok_or("The report is empty")?;
-            let name = report_name(&chain, report, days)?;
+            let name = report_name(&chain, report)?;
             let mut written = Vec::new();
             if formats.contains(&"json") {
                 let p = out_dir.join(format!("{name}.json"));

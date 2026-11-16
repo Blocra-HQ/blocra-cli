@@ -9,5 +9,6 @@ pub mod config;
 pub mod defaults;
 pub mod js;
 pub mod markdown;
+pub mod period;
 pub mod strkey;
 pub mod verify;

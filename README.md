@@ -164,7 +164,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: Blocra-HQ/blocra-cli@v0
         with:
-          days: 30          # api, subjects and trusted key come from blocra.json
+          days: 30          # or range: 1m / all, or from: 2026-11-01 (and to:)
+                            # api, subjects and trusted key come from blocra.json
       - run: |
           git config user.name "blocra-bot"
           git config user.email "blocra-bot@users.noreply.github.com"

@@ -15,8 +15,17 @@ inputs:
     description: Chain of the subjects
     required: false
     default: stellar
+  range:
+    description: Report period as a range (today, yesterday, all, 7d, 2w, 1m, 1y); overrides days
+    required: false
+  from:
+    description: Report period start, UTC date YYYY-MM-DD; overrides days
+    required: false
+  to:
+    description: Report period end, UTC date YYYY-MM-DD (with from; defaults to the latest day)
+    required: false
   days:
-    description: Report period in days
+    description: Report period in days (used when range and from are empty)
     required: false
     default: "30"
   out:
@@ -64,11 +73,17 @@ runs:
         BLOCRA_TRUSTED_KEY: ${{ inputs.trusted-key }}
         SUBJECTS: ${{ inputs.subjects }}
         DAYS: ${{ inputs.days }}
+        RANGE: ${{ inputs.range }}
+        FROM: ${{ inputs.from }}
+        TO: ${{ inputs.to }}
         CHAIN: ${{ inputs.chain }}
         OUT: ${{ inputs.out }}
       run: |
         set -euo pipefail
-        args=(report --days "$DAYS" --chain "$CHAIN" --out "$OUT")
+        if [ -n "$RANGE" ]; then period=(--range "$RANGE")
+        elif [ -n "$FROM" ]; then period=(--from "$FROM"); [ -n "$TO" ] && period+=(--to "$TO")
+        else period=(--days "$DAYS"); fi
+        args=(report "${period[@]}" --chain "$CHAIN" --out "$OUT")
         if [ -n "$SUBJECTS" ]; then read -ra subjects <<< "$SUBJECTS"; args+=("${subjects[@]}"); fi
         [ -z "${BLOCRA_API}" ] && unset BLOCRA_API
         [ -z "${BLOCRA_TRUSTED_KEY}" ] && unset BLOCRA_TRUSTED_KEY
